@@ -118,7 +118,7 @@ def _startup_message() -> str:
             ["neofetch", "--stdout"], stderr=subprocess.DEVNULL, timeout=10,
         ).decode(errors="replace")
         out = re.sub(r"\x1b\[[0-9;]*[mK]", "", out).strip()
-        return f"🖨 Scanner service started\n\n<pre>{_escape_html(out)}</pre>"
+        return f"🖨 Scanner service started · <code>{_local_ip()}</code>\n\n<pre>{_escape_html(out)}</pre>"
     except (FileNotFoundError, subprocess.SubprocessError):
         pass
     return f"🖨 Scanner service started\nLocal IP: <code>{_local_ip()}</code>"
