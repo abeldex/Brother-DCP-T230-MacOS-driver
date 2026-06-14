@@ -43,6 +43,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from t230scan import T230, ScanError, DeviceNotFound, Cancelled, ProtocolError
 from button import ButtonListener
+import telegram_notify
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -166,6 +167,8 @@ def scan_background(dpi: int = 300, mode: str = "C24BIT") -> None:
         sys.stderr.write(f"[button-scan] saved {pic_path}\n")
         thumb_path = THUMB_DIR / pic_path.name
         _make_thumbnail(pic_path, thumb_path)
+        modeLabel = "Color" if mode == "C24BIT" else "Grayscale"
+        telegram_notify.notify(pic_path, f"{pic_path.stem} · {dpi} DPI · {modeLabel}")
     except DeviceNotFound as e:
         sys.stderr.write(f"[button-scan] device not found: {e}\n")
     except (ScanError, ProtocolError, Exception) as e:
@@ -988,6 +991,8 @@ class Handler(BaseHTTPRequestHandler):
                 daemon=True).start()
             sys.stderr.write(f"[scan] id={scan_id} dpi={dpi} mode={mode} "
                              f"tmp={tmp_path} pic={pic_path}\n")
+            modeLabel = "Color" if mode == "C24BIT" else "Grayscale"
+            telegram_notify.notify(pic_path, f"{pic_path.stem} · {dpi} DPI · {modeLabel}")
         except Cancelled:
             sys.stderr.write(f"[scan] id={scan_id} cancelled\n")
         except DeviceNotFound as e:
