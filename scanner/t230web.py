@@ -1056,6 +1056,8 @@ def main() -> int:
     )
     listener.start()
 
+    telegram_notify.notify_startup()
+
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"t230web listening on http://{HOST}:{PORT}/  (Ctrl-C to quit)",
           file=sys.stderr)

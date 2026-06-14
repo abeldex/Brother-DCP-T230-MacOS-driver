@@ -19,6 +19,9 @@ Setup:
 import mimetypes
 import os
 import pathlib
+import re
+import socket
+import subprocess
 import sys
 import threading
 import urllib.error
@@ -97,3 +100,50 @@ def notify(pic_path: pathlib.Path, caption: str = "") -> None:
         target=_send_safe, args=(pic_path, caption),
         daemon=True, name="tg-notify",
     ).start()
+
+
+def _local_ip() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "unknown"
+
+
+def _startup_message() -> str:
+    # Try neofetch first; strip ANSI escape codes.
+    try:
+        out = subprocess.check_output(
+            ["neofetch", "--stdout"], stderr=subprocess.DEVNULL, timeout=10,
+        ).decode(errors="replace")
+        out = re.sub(r"\x1b\[[0-9;]*[mK]", "", out).strip()
+        return f"🖨 Scanner service started\n\n<pre>{_escape_html(out)}</pre>"
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    return f"🖨 Scanner service started\nLocal IP: <code>{_local_ip()}</code>"
+
+
+def _escape_html(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _send_startup() -> None:
+    try:
+        _api("sendMessage", {
+            "chat_id": _CHAT_ID,
+            "text": _startup_message(),
+            "parse_mode": "HTML",
+        })
+        sys.stderr.write("[telegram] startup message sent\n")
+    except urllib.error.HTTPError as e:
+        sys.stderr.write(f"[telegram] HTTP {e.code}: {e.read().decode(errors='replace')}\n")
+    except Exception as e:
+        sys.stderr.write(f"[telegram] ERROR: {e}\n")
+
+
+def notify_startup() -> None:
+    """Send a startup banner to the channel (fire-and-forget)."""
+    if not enabled():
+        return
+    threading.Thread(target=_send_startup, daemon=True, name="tg-startup").start()
