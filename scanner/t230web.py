@@ -166,8 +166,10 @@ def scan_background(dpi: int = 300, mode: str = "C24BIT") -> None:
         saved = True
         sys.stderr.write(f"[button-scan] saved {pic_path}\n")
         thumb_path = THUMB_DIR / pic_path.name
-        _make_thumbnail(pic_path, thumb_path)
         modeLabel = "Color" if mode == "C24BIT" else "Grayscale"
+        threading.Thread(
+            target=_make_thumbnail, args=(pic_path, thumb_path),
+            daemon=True).start()
         telegram_notify.notify(pic_path, f"{pic_path.stem} · {dpi} DPI · {modeLabel}")
     except DeviceNotFound as e:
         sys.stderr.write(f"[button-scan] device not found: {e}\n")
