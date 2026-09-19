@@ -18,3 +18,5 @@ scanner/getdeviceid
 scanner/dump_descriptors
 scanner/iface0_test
 scanner/check_alt
+brother_dcpt230_pjl_bin
+build_pkg/
