@@ -17,11 +17,15 @@ echo "==> Preparing package root directory..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$PKG_ROOT/Library/Printers/Brother/DCP-T230"
 mkdir -p "$PKG_ROOT/Library/Printers/PPDs/Contents/Resources"
+mkdir -p "$PKG_ROOT/usr/local/libexec/cups/filter"
 mkdir -p "$PKG_SCRIPTS"
 
-# 1. Install universal binary
+# 1. Install universal binary in Vendor dir AND in CUPS local filter dir
 cp "$SCRIPT_DIR/brother_dcpt230_pjl_bin" "$PKG_ROOT/Library/Printers/Brother/DCP-T230/brother_dcpt230_pjl"
 chmod 0755 "$PKG_ROOT/Library/Printers/Brother/DCP-T230/brother_dcpt230_pjl"
+
+cp "$SCRIPT_DIR/brother_dcpt230_pjl_bin" "$PKG_ROOT/usr/local/libexec/cups/filter/brother_dcpt230_pjl"
+chmod 0755 "$PKG_ROOT/usr/local/libexec/cups/filter/brother_dcpt230_pjl"
 
 # 2. Install gzipped PPD
 gzip -9 -c "$SCRIPT_DIR/brother-dcpt230.ppd" > "$PKG_ROOT/Library/Printers/PPDs/Contents/Resources/Brother-DCP-T230.ppd.gz"
@@ -34,10 +38,33 @@ set -e
 
 PRINTER_NAME="DCP_T230"
 PPD_PATH="/Library/Printers/PPDs/Contents/Resources/Brother-DCP-T230.ppd.gz"
-FILTER_PATH="/Library/Printers/Brother/DCP-T230/brother_dcpt230_pjl"
+VENDOR_FILTER="/Library/Printers/Brother/DCP-T230/brother_dcpt230_pjl"
+LOCAL_FILTER="/usr/local/libexec/cups/filter/brother_dcpt230_pjl"
+SYS_FILTER="/usr/libexec/cups/filter/brother_dcpt230_pjl"
 
-chmod 0755 "$FILTER_PATH" || true
+# Fix permissions
+chmod 0755 "$VENDOR_FILTER" || true
+chown root:wheel "$VENDOR_FILTER" || true
+
+# Ensure filter exists in /usr/local/libexec/cups/filter
+mkdir -p /usr/local/libexec/cups/filter
+cp -f "$VENDOR_FILTER" "$LOCAL_FILTER" || ln -sf "$VENDOR_FILTER" "$LOCAL_FILTER" || true
+chmod 0755 "$LOCAL_FILTER" || true
+chown root:wheel "$LOCAL_FILTER" || true
+
+# Also try system filter dir if writable
+if mkdir -p /usr/libexec/cups/filter 2>/dev/null; then
+    ln -sf "$VENDOR_FILTER" "$SYS_FILTER" 2>/dev/null || cp -f "$VENDOR_FILTER" "$SYS_FILTER" 2>/dev/null || true
+    chmod 0755 "$SYS_FILTER" 2>/dev/null || true
+    chown -h root:wheel "$SYS_FILTER" 2>/dev/null || true
+fi
+
 chmod 0644 "$PPD_PATH" || true
+chown root:wheel "$PPD_PATH" || true
+
+# Restart CUPS to reload filter registry
+killall -HUP cupsd 2>/dev/null || true
+sleep 1
 
 # Auto-register printer if USB cable is plugged in
 if command -v lpinfo >/dev/null 2>&1; then
@@ -54,7 +81,7 @@ exit 0
 EOF
 chmod 0755 "$PKG_SCRIPTS/postinstall"
 
-# 3. Clean extended attributes and dot-underscore files
+# Clean extended attributes and dot-underscore files
 COPYFILE_DISABLE=1
 export COPYFILE_DISABLE
 find "$PKG_ROOT" -name "._*" -delete || true
@@ -67,7 +94,7 @@ pkgbuild \
     --root "$PKG_ROOT" \
     --scripts "$PKG_SCRIPTS" \
     --identifier "com.brother.dcpt230.driver" \
-    --version "1.0.0" \
+    --version "1.0.1" \
     --ownership recommended \
     --install-location "/" \
     "$OUTPUT_PKG"
